@@ -1,0 +1,868 @@
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenSandbox · 管理后台</title>
+  <style>
+    :root {
+      --bg:      oklch(97% 0.018 70);
+      --surface: oklch(99% 0.008 70);
+      --fg:      oklch(22% 0.02 50);
+      --muted:   oklch(50% 0.018 50);
+      --border:  oklch(90% 0.014 70);
+      --accent:  oklch(64% 0.13 28);
+
+      --accent-soft: color-mix(in oklch, var(--accent) 14%, transparent);
+      --fg-soft:     color-mix(in oklch, var(--fg) 6%, transparent);
+      --green:       oklch(55% 0.14 150);
+      --green-soft:  color-mix(in oklch, oklch(55% 0.14 150) 14%, transparent);
+      --red:         oklch(55% 0.18 25);
+      --red-soft:    color-mix(in oklch, oklch(55% 0.18 25) 14%, transparent);
+      --yellow:      oklch(70% 0.14 85);
+      --yellow-soft: color-mix(in oklch, oklch(70% 0.14 85) 18%, transparent);
+      --blue:        oklch(55% 0.14 250);
+      --blue-soft:   color-mix(in oklch, oklch(55% 0.14 250) 14%, transparent);
+
+      --font-display: 'Tiempos Headline', 'Newsreader', 'Iowan Old Style', Georgia, serif;
+      --font-body:    'Söhne', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --font-mono:    ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+
+      --fs-h1: clamp(28px, 3vw, 36px);
+      --fs-h2: 20px;
+      --fs-body: 14px;
+      --fs-meta: 12px;
+
+      --radius: 10px;
+      --radius-lg: 14px;
+      --container: 1200px;
+      --gutter: 32px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: var(--fs-body);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    p { text-wrap: pretty; margin: 0; }
+    h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+    .container {
+      max-width: var(--container);
+      margin-inline: auto;
+      padding-inline: var(--gutter);
+    }
+
+    /* ─── topnav */
+    .topnav {
+      position: sticky; top: 0; z-index: 50;
+      background: color-mix(in oklch, var(--bg) 92%, transparent);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .topnav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-block: 12px;
+    }
+    .logo {
+      font-family: var(--font-display);
+      font-size: 19px; font-weight: 600; letter-spacing: -0.01em;
+    }
+    .logo span { color: var(--accent); }
+    .topnav-actions { display: flex; gap: 12px; align-items: center; }
+    .btn-sm {
+      padding: 6px 14px; font-size: 13px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); color: var(--fg);
+      transition: border-color 0.15s;
+    }
+    .btn-sm:hover { border-color: var(--fg); }
+    .btn-accent {
+      background: var(--accent); color: var(--surface);
+      border-color: var(--accent);
+    }
+    .btn-accent:hover {
+      background: color-mix(in oklch, var(--accent) 85%, black);
+    }
+
+    /* ─── page header */
+    .page-header { padding-block: 28px 20px; }
+    .page-header h1 {
+      font-family: var(--font-display);
+      font-size: var(--fs-h1);
+      letter-spacing: -0.02em;
+    }
+    .page-header .lead {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    /* ─── stat cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    @media (max-width: 920px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 540px) { .stats-grid { grid-template-columns: 1fr; } }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+      transition: box-shadow 0.2s;
+    }
+    .stat-card:hover {
+      box-shadow: 0 2px 12px color-mix(in oklch, var(--fg) 6%, transparent);
+    }
+    .stat-card .stat-label {
+      font-size: 12px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      font-family: var(--font-mono);
+      margin-bottom: 8px;
+    }
+    .stat-card .stat-value {
+      font-family: var(--font-display);
+      font-size: 36px; font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .stat-card .stat-sub {
+      font-size: 12px; color: var(--muted); margin-top: 6px;
+    }
+    .stat-card.accent-border { border-top: 2.5px solid var(--accent); }
+    .stat-card.green-border  { border-top: 2.5px solid var(--green); }
+    .stat-card.yellow-border { border-top: 2.5px solid var(--yellow); }
+    .stat-card.red-border    { border-top: 2.5px solid var(--red); }
+
+    /* ─── toolbar */
+    .toolbar {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .search-box {
+      flex: 1; min-width: 200px;
+      padding: 9px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--fg);
+      font-size: 14px;
+      font-family: var(--font-body);
+    }
+    .search-box:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .search-box::placeholder { color: var(--muted); }
+    .filter-group { display: flex; gap: 6px; }
+    .filter-btn {
+      padding: 7px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+    .filter-btn:hover { border-color: var(--fg); color: var(--fg); }
+    .filter-btn.active {
+      background: var(--fg);
+      color: var(--surface);
+      border-color: var(--fg);
+    }
+
+    /* ─── sandbox table */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .sandbox-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .sandbox-table th {
+      padding: 12px 16px;
+      text-align: left;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in oklch, var(--bg) 50%, var(--surface));
+    }
+    .sandbox-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .sandbox-table tbody tr { transition: background 0.1s; }
+    .sandbox-table tbody tr:hover { background: var(--fg-soft); }
+    .sandbox-table tbody tr:last-child td { border-bottom: none; }
+
+    /* ─── status pills */
+    .status {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    .status::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-running    { background: var(--green-soft);  color: var(--green); }
+    .status-running::before   { background: var(--green); }
+    .status-stopped    { background: var(--fg-soft);     color: var(--muted); }
+    .status-stopped::before   { background: var(--muted); }
+    .status-creating   { background: var(--blue-soft);   color: var(--blue); }
+    .status-creating::before  { background: var(--blue); }
+    .status-error      { background: var(--red-soft);    color: var(--red); }
+    .status-error::before     { background: var(--red); }
+    .status-expired    { background: var(--yellow-soft); color: oklch(40% 0.08 85); }
+    .status-expired::before   { background: var(--yellow); }
+
+    /* ─── sandbox name cell */
+    .sandbox-name { font-weight: 600; font-size: 14px; color: var(--fg); }
+    .sandbox-id {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ─── mono timestamp */
+    .time-cell {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ─── action buttons */
+    .actions-cell { display: flex; gap: 6px; }
+    .act-btn {
+      padding: 5px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .act-btn:hover { border-color: var(--fg); color: var(--fg); }
+    .act-btn.act-danger:hover { border-color: var(--red); color: var(--red); }
+    .act-btn.act-accent:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ─── modal */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: color-mix(in oklch, var(--fg) 40%, transparent);
+      z-index: 100;
+      place-items: center;
+    }
+    .modal-overlay.open { display: grid; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: 0 8px 32px color-mix(in oklch, var(--fg) 15%, transparent);
+    }
+    .modal h2 {
+      font-family: var(--font-display);
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+    .modal .modal-sub {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+    .modal .field { margin-bottom: 16px; }
+    .modal .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .modal input[type="text"],
+    .modal textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      color: var(--fg);
+      font: inherit;
+      font-size: 14px;
+    }
+    .modal input:focus,
+    .modal textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .modal textarea {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      min-height: 100px;
+      resize: vertical;
+    }
+    .modal-actions {
+      display: flex; gap: 10px; justify-content: flex-end;
+      margin-top: 24px;
+    }
+    .btn-cancel {
+      padding: 9px 18px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--fg);
+      font-size: 14px;
+    }
+    .btn-cancel:hover { border-color: var(--fg); }
+    .btn-confirm {
+      padding: 9px 18px;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      background: var(--accent);
+      color: var(--surface);
+      font-size: 14px;
+    }
+    .btn-confirm:hover {
+      background: color-mix(in oklch, var(--accent) 85%, black);
+    }
+    .btn-danger-solid {
+      padding: 9px 18px;
+      border: 1px solid var(--red);
+      border-radius: var(--radius);
+      background: var(--red);
+      color: var(--surface);
+      font-size: 14px;
+    }
+    .btn-danger-solid:hover {
+      background: color-mix(in oklch, var(--red) 85%, black);
+    }
+
+    /* ─── duration options */
+    .duration-options { display: flex; gap: 8px; flex-wrap: wrap; }
+    .duration-opt {
+      padding: 8px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+    .duration-opt:hover { border-color: var(--fg); color: var(--fg); }
+    .duration-opt.selected {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    /* ─── toast */
+    .toast-container {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      z-index: 200;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast {
+      padding: 12px 20px;
+      background: var(--fg);
+      color: var(--surface);
+      border-radius: var(--radius);
+      font-size: 13px;
+      box-shadow: 0 4px 16px color-mix(in oklch, var(--fg) 25%, transparent);
+      animation: toast-in 0.25s ease-out;
+    }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+
+    /* ─── pagination */
+    .pagination {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .pagination-info {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .pagination-controls {
+      display: flex; align-items: center; gap: 4px;
+    }
+    .page-btn {
+      min-width: 32px; height: 32px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-family: var(--font-mono);
+      transition: all 0.15s;
+      padding: 0 6px;
+    }
+    .page-btn:hover:not(:disabled) { border-color: var(--fg); color: var(--fg); }
+    .page-btn:disabled { opacity: 0.35; cursor: default; }
+    .page-btn.active {
+      background: var(--fg);
+      color: var(--surface);
+      border-color: var(--fg);
+    }
+    .page-btn.ellipsis {
+      border: none; cursor: default; min-width: 24px;
+    }
+    .page-btn.ellipsis:hover { border: none; color: var(--muted); }
+    .per-page-select {
+      margin-inline-start: 8px;
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--fg);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .per-page-select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .pagefoot {
+      margin-top: 48px;
+      padding-block: 20px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .pagefoot .row-between {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+    .muted { color: var(--muted); }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  </style>
+</head>
+<body>
+
+  <header class="topnav" data-od-id="topnav">
+    <div class="container topnav-inner">
+      <span class="logo">Open<span>Sandbox</span></span>
+      <div class="topnav-actions">
+        <button class="btn-sm" onclick="location.reload()">刷新</button>
+        <button class="btn-sm btn-accent" onclick="showToast('新建功能开发中')">+ 新建沙箱</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" data-od-id="main-content">
+
+    <div class="page-header" data-od-id="page-header">
+      <h1>沙箱管理</h1>
+      <p class="lead">管理 OpenSandbox 实例的生命周期 — 查看状态、续期、执行命令、销毁。</p>
+    </div>
+
+    <div class="stats-grid" data-od-id="stats">
+      <div class="stat-card accent-border">
+        <div class="stat-label">沙箱总数</div>
+        <div class="stat-value mono" id="stat-total">8</div>
+      </div>
+      <div class="stat-card green-border">
+        <div class="stat-label">运行中</div>
+        <div class="stat-value mono" id="stat-running">4</div>
+        <div class="stat-sub">资源占用 62%</div>
+      </div>
+      <div class="stat-card yellow-border">
+        <div class="stat-label">即将过期</div>
+        <div class="stat-value mono" id="stat-expiring">2</div>
+        <div class="stat-sub">24 小时内到期</div>
+      </div>
+      <div class="stat-card red-border">
+        <div class="stat-label">已停止</div>
+        <div class="stat-value mono" id="stat-stopped">2</div>
+      </div>
+    </div>
+
+    <div class="toolbar" data-od-id="toolbar">
+      <input class="search-box" type="text" placeholder="搜索沙箱名称或 ID…" id="search-input" oninput="filterTable()" />
+      <div class="filter-group">
+        <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">全部</button>
+        <button class="filter-btn" data-filter="running" onclick="setFilter('running', this)">运行中</button>
+        <button class="filter-btn" data-filter="stopped" onclick="setFilter('stopped', this)">已停止</button>
+        <button class="filter-btn" data-filter="creating" onclick="setFilter('creating', this)">创建中</button>
+        <button class="filter-btn" data-filter="error" onclick="setFilter('error', this)">异常</button>
+      </div>
+    </div>
+
+    <div class="table-wrap" data-od-id="table">
+      <table class="sandbox-table">
+        <thead>
+          <tr>
+            <th>沙箱</th>
+            <th>状态</th>
+            <th>镜像</th>
+            <th>创建时间</th>
+            <th>到期时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="sandbox-tbody"></tbody>
+      </table>
+      <div class="empty-state" id="empty-state" style="display:none;">
+        <p>没有匹配的沙箱实例</p>
+      </div>
+      <div class="pagination" id="pagination" data-od-id="pagination"></div>
+    </div>
+
+  </main>
+
+  <div class="modal-overlay" id="modal-cmd" data-od-id="modal-cmd">
+    <div class="modal">
+      <h2>执行命令</h2>
+      <p class="modal-sub">在沙箱 <strong id="cmd-target"></strong> 中执行命令</p>
+      <div class="field">
+        <label>命令</label>
+        <textarea id="cmd-input" placeholder="输入要执行的命令，如 ls -la、cat /etc/os-release"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal('modal-cmd')">取消</button>
+        <button class="btn-confirm" onclick="runCommand()">执行</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-renew" data-od-id="modal-renew">
+    <div class="modal">
+      <h2>续期沙箱</h2>
+      <p class="modal-sub">延长沙箱 <strong id="renew-target"></strong> 的有效时间</p>
+      <div class="field">
+        <label>续期时长</label>
+        <div class="duration-options" id="duration-options">
+          <button class="duration-opt" data-hours="1" onclick="selectDuration(this)">1 小时</button>
+          <button class="duration-opt selected" data-hours="6" onclick="selectDuration(this)">6 小时</button>
+          <button class="duration-opt" data-hours="24" onclick="selectDuration(this)">24 小时</button>
+          <button class="duration-opt" data-hours="72" onclick="selectDuration(this)">3 天</button>
+          <button class="duration-opt" data-hours="168" onclick="selectDuration(this)">7 天</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal('modal-renew')">取消</button>
+        <button class="btn-confirm" onclick="renewSandbox()">确认续期</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-delete" data-od-id="modal-delete">
+    <div class="modal">
+      <h2>删除沙箱</h2>
+      <p class="modal-sub">此操作不可撤销。沙箱 <strong id="delete-target"></strong> 及其所有数据将被永久销毁。</p>
+      <div class="field">
+        <label>确认名称</label>
+        <input type="text" id="delete-confirm-input" placeholder="输入沙箱名称以确认" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal('modal-delete')">取消</button>
+        <button class="btn-danger-solid" onclick="deleteSandbox()">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <footer class="pagefoot" data-od-id="footer">
+    <div class="container row-between">
+      <span class="mono">OpenSandbox v0.1.0</span>
+      <span class="muted">管理后台</span>
+    </div>
+  </footer>
+
+  <script>
+    const sandboxes = [
+      { id: 'sb-a7f3', name: 'api-staging',      image: 'node:20-alpine',    status: 'running',  created: '2026-05-06 14:22', expires: '2026-05-07 14:22' },
+      { id: 'sb-b2e1', name: 'redis-test',        image: 'redis:7',           status: 'running',  created: '2026-05-06 09:10', expires: '2026-05-07 21:10' },
+      { id: 'sb-c9d4', name: 'ml-training-gpu',   image: 'pytorch/pytorch:2.3', status: 'running', created: '2026-05-05 18:00', expires: '2026-05-07 06:00' },
+      { id: 'sb-d1f8', name: 'pg-migration-test', image: 'postgres:16',       status: 'expired',  created: '2026-05-04 11:30', expires: '2026-05-06 11:30' },
+      { id: 'sb-e5a2', name: 'frontend-preview',  image: 'nginx:alpine',      status: 'running',  created: '2026-05-06 16:45', expires: '2026-05-07 04:45' },
+      { id: 'sb-f3c6', name: 'infra-chaos-test',  image: 'alpine:3.19',       status: 'stopped',  created: '2026-05-03 08:00', expires: '2026-05-05 08:00' },
+      { id: 'sb-g7b9', name: 'kafka-consumer',     image: 'confluentinc/cp-kafka:7.6', status: 'error', created: '2026-05-07 01:15', expires: '2026-05-08 01:15' },
+      { id: 'sb-h4d0', name: 'legacy-java-app',   image: 'eclipse-temurin:21', status: 'stopped', created: '2026-05-02 20:00', expires: '2026-05-04 20:00' },
+      { id: 'sb-i2k5', name: 'go-microservice',   image: 'golang:1.22',       status: 'running',  created: '2026-05-07 08:30', expires: '2026-05-08 20:30' },
+      { id: 'sb-j6m1', name: 'rust-cli-build',    image: 'rust:1.77',         status: 'stopped',  created: '2026-05-04 13:45', expires: '2026-05-05 13:45' },
+      { id: 'sb-k8n3', name: 'elastic-search-dev', image: 'elasticsearch:8.13', status: 'running', created: '2026-05-06 07:00', expires: '2026-05-08 07:00' },
+      { id: 'sb-l1p7', name: 'mysql-benchmark',   image: 'mysql:8.0',         status: 'expired',  created: '2026-05-03 16:20', expires: '2026-05-05 16:20' },
+      { id: 'sb-m4q9', name: 'rabbitmq-queue',    image: 'rabbitmq:3.13',     status: 'running',  created: '2026-05-07 10:00', expires: '2026-05-08 10:00' },
+      { id: 'sb-n7r2', name: 'grafana-monitor',   image: 'grafana/grafana:10.4', status: 'error', created: '2026-05-06 22:15', expires: '2026-05-07 22:15' },
+      { id: 'sb-o0s8', name: 'python-scraper',    image: 'python:3.12',       status: 'running',  created: '2026-05-07 05:40', expires: '2026-05-08 17:40' },
+      { id: 'sb-p3t4', name: 'mongo-dev',         image: 'mongo:7.0',         status: 'stopped',  created: '2026-05-01 12:00', expires: '2026-05-03 12:00' },
+      { id: 'sb-q6u6', name: 'vue-spa-preview',   image: 'node:20-alpine',    status: 'running',  created: '2026-05-07 11:30', expires: '2026-05-08 23:30' },
+      { id: 'sb-r9v1', name: 'vault-secrets',     image: 'hashicorp/vault:1.16', status: 'expired', created: '2026-05-02 09:00', expires: '2026-05-04 09:00' },
+      { id: 'sb-s2w5', name: 'cassandra-cluster', image: 'cassandra:5.0',     status: 'creating', created: '2026-05-07 12:00', expires: '2026-05-09 00:00' },
+      { id: 'sb-t5x3', name: 'deno-fresh-app',    image: 'denoland/deno:1.42', status: 'running', created: '2026-05-06 20:30', expires: '2026-05-08 08:30' },
+    ];
+
+    let currentFilter = 'all';
+    let activeSandboxId = null;
+    let selectedDuration = 6;
+    let currentPage = 1;
+    let perPage = 5;
+
+    const statusLabels = {
+      running: '运行中', stopped: '已停止', creating: '创建中', error: '异常', expired: '已过期',
+    };
+
+    function getFiltered() {
+      const search = document.getElementById('search-input').value.toLowerCase();
+      return sandboxes.filter(sb => {
+        const matchFilter = currentFilter === 'all' || sb.status === currentFilter;
+        const matchSearch = sb.name.toLowerCase().includes(search) || sb.id.toLowerCase().includes(search);
+        return matchFilter && matchSearch;
+      });
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('sandbox-tbody');
+      const empty = document.getElementById('empty-state');
+      const filtered = getFiltered();
+      const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        document.getElementById('pagination').innerHTML = '';
+        return;
+      }
+      empty.style.display = 'none';
+
+      const start = (currentPage - 1) * perPage;
+      const pageItems = filtered.slice(start, start + perPage);
+
+      tbody.innerHTML = pageItems.map(sb => `
+        <tr>
+          <td><div class="sandbox-name">${sb.name}</div><div class="sandbox-id">${sb.id}</div></td>
+          <td><span class="status status-${sb.status}">${statusLabels[sb.status]}</span></td>
+          <td class="time-cell">${sb.image}</td>
+          <td class="time-cell">${sb.created}</td>
+          <td class="time-cell">${sb.expires}</td>
+          <td><div class="actions-cell">
+            <button class="act-btn act-accent" onclick="openRenew('${sb.id}')">续期</button>
+            <button class="act-btn" onclick="openCmd('${sb.id}')">执行命令</button>
+            <button class="act-btn act-danger" onclick="openDelete('${sb.id}')">删除</button>
+          </div></td>
+        </tr>
+      `).join('');
+
+      renderPagination(filtered.length, totalPages);
+    }
+
+    function renderPagination(total, totalPages) {
+      const el = document.getElementById('pagination');
+      const start = (currentPage - 1) * perPage + 1;
+      const end = Math.min(currentPage * perPage, total);
+
+      const info = `<span class="pagination-info">显示 ${start}–${end}，共 ${total} 条</span>
+        <label class="pagination-info" style="display:inline-flex;align-items:center;gap:4px;margin-inline-start:12px;">
+          每页
+          <select class="per-page-select" onchange="changePerPage(this.value)">
+            <option value="5" ${perPage===5?'selected':''}>5</option>
+            <option value="10" ${perPage===10?'selected':''}>10</option>
+            <option value="20" ${perPage===20?'selected':''}>20</option>
+            <option value="50" ${perPage===50?'selected':''}>50</option>
+          </select>
+          条
+        </label>`;
+
+      let btns = `<button class="page-btn" onclick="goToPage(${currentPage-1})" ${currentPage<=1?'disabled':''}>&lsaquo;</button>`;
+
+      const pages = getPageNumbers(currentPage, totalPages);
+      pages.forEach(p => {
+        if (p === '...') {
+          btns += `<button class="page-btn ellipsis" disabled>…</button>`;
+        } else {
+          btns += `<button class="page-btn ${p===currentPage?'active':''}" onclick="goToPage(${p})">${p}</button>`;
+        }
+      });
+
+      btns += `<button class="page-btn" onclick="goToPage(${currentPage+1})" ${currentPage>=totalPages?'disabled':''}>&rsaquo;</button>`;
+
+      el.innerHTML = `${info}<div class="pagination-controls">${btns}</div>`;
+    }
+
+    function getPageNumbers(current, total) {
+      if (total <= 7) return Array.from({length: total}, (_, i) => i + 1);
+      const pages = [];
+      pages.push(1);
+      if (current > 3) pages.push('...');
+      for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i);
+      if (current < total - 2) pages.push('...');
+      pages.push(total);
+      return pages;
+    }
+
+    function goToPage(p) {
+      const totalPages = Math.max(1, Math.ceil(getFiltered().length / perPage));
+      if (p < 1 || p > totalPages) return;
+      currentPage = p;
+      renderTable();
+    }
+
+    function changePerPage(val) {
+      perPage = parseInt(val);
+      currentPage = 1;
+      renderTable();
+    }
+
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      currentPage = 1;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderTable();
+    }
+    function filterTable() { currentPage = 1; renderTable(); }
+
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+    });
+
+    function openCmd(id) {
+      activeSandboxId = id;
+      const sb = sandboxes.find(s => s.id === id);
+      document.getElementById('cmd-target').textContent = sb.name;
+      document.getElementById('cmd-input').value = '';
+      openModal('modal-cmd');
+    }
+    function runCommand() {
+      const cmd = document.getElementById('cmd-input').value.trim();
+      if (!cmd) return;
+      const sb = sandboxes.find(s => s.id === activeSandboxId);
+      closeModal('modal-cmd');
+      showToast(`在 ${sb.name} 中执行: ${cmd}`);
+    }
+
+    function openRenew(id) {
+      activeSandboxId = id;
+      const sb = sandboxes.find(s => s.id === id);
+      document.getElementById('renew-target').textContent = sb.name;
+      selectedDuration = 6;
+      document.querySelectorAll('.duration-opt').forEach(b => b.classList.toggle('selected', parseInt(b.dataset.hours) === selectedDuration));
+      openModal('modal-renew');
+    }
+    function selectDuration(btn) {
+      selectedDuration = parseInt(btn.dataset.hours);
+      document.querySelectorAll('.duration-opt').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    }
+    function renewSandbox() {
+      const sb = sandboxes.find(s => s.id === activeSandboxId);
+      const expires = new Date(sb.expires.replace(' ', 'T'));
+      expires.setHours(expires.getHours() + selectedDuration);
+      sb.expires = expires.toISOString().slice(0, 16).replace('T', ' ');
+      if (sb.status === 'expired') sb.status = 'running';
+      closeModal('modal-renew');
+      renderTable();
+      updateStats();
+      showToast(`${sb.name} 已续期 ${selectedDuration} 小时`);
+    }
+
+    function openDelete(id) {
+      activeSandboxId = id;
+      const sb = sandboxes.find(s => s.id === id);
+      document.getElementById('delete-target').textContent = sb.name;
+      document.getElementById('delete-confirm-input').value = '';
+      openModal('modal-delete');
+    }
+    function deleteSandbox() {
+      const sb = sandboxes.find(s => s.id === activeSandboxId);
+      const confirmVal = document.getElementById('delete-confirm-input').value.trim();
+      if (confirmVal !== sb.name) { showToast('名称不匹配，请重新输入'); return; }
+      sandboxes.splice(sandboxes.indexOf(sb), 1);
+      closeModal('modal-delete');
+      renderTable();
+      updateStats();
+      showToast(`${sb.name} 已删除`);
+    }
+
+    function updateStats() {
+      document.getElementById('stat-total').textContent = sandboxes.length;
+      document.getElementById('stat-running').textContent = sandboxes.filter(s => s.status === 'running').length;
+      const now = new Date();
+      document.getElementById('stat-expiring').textContent = sandboxes.filter(s => {
+        if (s.status !== 'running') return false;
+        const diff = new Date(s.expires.replace(' ', 'T')) - now;
+        return diff > 0 && diff < 86400000;
+      }).length;
+      document.getElementById('stat-stopped').textContent = sandboxes.filter(s => s.status === 'stopped' || s.status === 'expired').length;
+    }
+
+    function showToast(msg) {
+      const c = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.textContent = msg;
+      c.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.2s'; setTimeout(() => t.remove(), 200); }, 3000);
+    }
+
+    renderTable();
+    updateStats();
+  </script>
+</body>
+</html>
