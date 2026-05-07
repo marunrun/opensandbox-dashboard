@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   Activity,
   FileSearch,
@@ -57,9 +57,27 @@ export function Dashboard() {
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
+  const loadSandboxes = useCallback(async () => {
+    setError("");
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    if (stateFilter !== "All") params.set("state", stateFilter);
+
+    try {
+      const response = await fetch(`/api/sandboxes?${params.toString()}`);
+      const data = await readJson<ListResponse>(response);
+      setSandboxes(data.items);
+      setTotalItems(data.pagination?.totalItems ?? data.items.length);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }, [page, pageSize, stateFilter]);
+
   useEffect(() => {
     void loadSandboxes();
-  }, [page, pageSize, stateFilter]);
+  }, [loadSandboxes]);
 
   useEffect(() => {
     if (!toast) return;
@@ -88,24 +106,6 @@ export function Dashboard() {
 
     return { total: totalItems || sandboxes.length, running, paused, expiring };
   }, [sandboxes, totalItems]);
-
-  async function loadSandboxes() {
-    setError("");
-    const params = new URLSearchParams({
-      page: String(page),
-      pageSize: String(pageSize),
-    });
-    if (stateFilter !== "All") params.set("state", stateFilter);
-
-    try {
-      const response = await fetch(`/api/sandboxes?${params.toString()}`);
-      const data = await readJson<ListResponse>(response);
-      setSandboxes(data.items);
-      setTotalItems(data.pagination?.totalItems ?? data.items.length);
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  }
 
   function openDialog(mode: DialogMode, sandbox?: SandboxInfo) {
     setActiveSandbox(sandbox ?? null);
