@@ -365,7 +365,7 @@ function ConfigDialog({ config, onClose, onSave }: { config: OpenSandboxConfig; 
   return (
     <Modal title="连接配置" subtitle="配置会保存在当前浏览器" onClose={onClose}>
       <Field label="OpenSandbox Domain">
-        <input value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="opensandbox-api-kn.sk8s.cn" />
+        <input value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="127.0.0.1:8080" />
       </Field>
       <Field label="API Key">
         <input value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="输入你的 OpenSandbox API Key" />
