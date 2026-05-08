@@ -15,7 +15,7 @@ export function getOpenSandboxRuntimeConfig(): OpenSandboxRuntimeConfig {
     domain: process.env.OPENSANDBOX_DOMAIN ?? "localhost:8080",
     apiKey: process.env.OPENSANDBOX_API_KEY,
     protocol,
-    requestTimeoutSeconds: Number(process.env.OPENSANDBOX_REQUEST_TIMEOUT_SECONDS ?? 60),
+    requestTimeoutSeconds: Number(process.env.OPENSANDBOX_REQUEST_TIMEOUT_SECONDS ?? 300),
     useServerProxy: process.env.OPENSANDBOX_USE_SERVER_PROXY !== "false",
   };
 }
