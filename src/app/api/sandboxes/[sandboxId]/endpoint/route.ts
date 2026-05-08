@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     const { sandboxId } = await params;
     const url = new URL(request.url);
     const query = endpointSchema.parse({ port: url.searchParams.get("port") });
-    const result = await withSandbox(sandboxId, async (sandbox) => ({
+    const result = await withSandbox(request, sandboxId, async (sandbox) => ({
       endpoint: await sandbox.getEndpoint(query.port),
       url: await sandbox.getEndpointUrl(query.port),
     }));

@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       page: url.searchParams.get("page") ?? undefined,
       pageSize: url.searchParams.get("pageSize") ?? undefined,
     });
-    const response = await withManager((manager) =>
+    const response = await withManager(request, (manager) =>
       manager.listSandboxInfos({
         states: query.state ? [query.state] : undefined,
         page: query.page,
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = createSandboxSchema.parse(await request.json());
-    const sandbox = await createSandbox(body);
+    const sandbox = await createSandbox(body, request);
 
     try {
       const info = await sandbox.getInfo();

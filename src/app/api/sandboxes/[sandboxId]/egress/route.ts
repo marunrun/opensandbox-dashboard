@@ -12,7 +12,7 @@ type Params = {
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
     const { sandboxId } = await params;
-    const policy = await withSandbox(sandboxId, (sandbox) => sandbox.getEgressPolicy());
+    const policy = await withSandbox(_request, sandboxId, (sandbox) => sandbox.getEgressPolicy());
     return NextResponse.json(policy);
   } catch (error) {
     return toErrorResponse(error);
@@ -23,7 +23,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { sandboxId } = await params;
     const body = egressPatchSchema.parse(await request.json());
-    await withSandbox(sandboxId, (sandbox) => sandbox.patchEgressRules(body.rules));
+    await withSandbox(request, sandboxId, (sandbox) => sandbox.patchEgressRules(body.rules));
     return NextResponse.json({ ok: true });
   } catch (error) {
     return toErrorResponse(error);

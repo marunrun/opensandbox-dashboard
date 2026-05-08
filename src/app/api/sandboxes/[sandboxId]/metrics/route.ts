@@ -8,10 +8,10 @@ type Params = {
   params: Promise<{ sandboxId: string }>;
 };
 
-export async function GET(_request: NextRequest, { params }: Params) {
+export async function GET(request: NextRequest, { params }: Params) {
   try {
     const { sandboxId } = await params;
-    const metrics = await withSandbox(sandboxId, (sandbox) => sandbox.getMetrics());
+    const metrics = await withSandbox(request, sandboxId, (sandbox) => sandbox.getMetrics());
     return NextResponse.json(metrics);
   } catch (error) {
     return toErrorResponse(error);

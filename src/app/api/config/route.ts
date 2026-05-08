@@ -3,8 +3,8 @@ import { getOpenSandboxRuntimeConfig } from "@/lib/opensandbox/config";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  const config = getOpenSandboxRuntimeConfig();
+export async function GET(request: Request) {
+  const config = getOpenSandboxRuntimeConfig(request);
 
   return NextResponse.json({
     domain: config.domain,

@@ -9,6 +9,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Settings,
   RotateCw,
   Search,
   Terminal,
@@ -42,7 +43,23 @@ type ListResponse = {
 
 type DialogMode = "create" | "command" | "renew" | "delete" | "endpoint" | "files" | "metrics" | null;
 
+type OpenSandboxConfig = {
+  domain: string;
+  apiKey: string;
+  protocol: "http" | "https";
+  requestTimeoutSeconds: number;
+  useServerProxy: boolean;
+};
+
 const stateFilters = ["All", "Running", "Paused", "Creating", "Error", "Deleted"];
+const configStorageKey = "opensandbox.dashboard.config.v1";
+const defaultConfig: OpenSandboxConfig = {
+  domain: "",
+  apiKey: "",
+  protocol: "https",
+  requestTimeoutSeconds: 300,
+  useServerProxy: true,
+};
 
 export function Dashboard() {
   const [sandboxes, setSandboxes] = useState<SandboxInfo[]>([]);
@@ -52,12 +69,16 @@ export function Dashboard() {
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [dialog, setDialog] = useState<DialogMode>(null);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [config, setConfig] = useState<OpenSandboxConfig>(defaultConfig);
+  const [configReady, setConfigReady] = useState(false);
   const [activeSandbox, setActiveSandbox] = useState<SandboxInfo | null>(null);
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const loadSandboxes = useCallback(async () => {
+    if (!configReady || !isConfigComplete(config)) return;
     setError("");
     const params = new URLSearchParams({
       page: String(page),
@@ -66,14 +87,24 @@ export function Dashboard() {
     if (stateFilter !== "All") params.set("state", stateFilter);
 
     try {
-      const response = await fetch(`/api/sandboxes?${params.toString()}`);
+      const response = await apiFetch(config, `/api/sandboxes?${params.toString()}`);
       const data = await readJson<ListResponse>(response);
       setSandboxes(data.items);
       setTotalItems(data.pagination?.totalItems ?? data.items.length);
     } catch (err) {
       setError(errorMessage(err));
     }
-  }, [page, pageSize, stateFilter]);
+  }, [config, configReady, page, pageSize, stateFilter]);
+
+  useEffect(() => {
+    const stored = readStoredConfig();
+    if (stored) {
+      setConfig(stored);
+    } else {
+      setConfigOpen(true);
+    }
+    setConfigReady(true);
+  }, []);
 
   useEffect(() => {
     void loadSandboxes();
@@ -108,8 +139,20 @@ export function Dashboard() {
   }, [sandboxes, totalItems]);
 
   function openDialog(mode: DialogMode, sandbox?: SandboxInfo) {
+    if (!isConfigComplete(config)) {
+      setConfigOpen(true);
+      return;
+    }
     setActiveSandbox(sandbox ?? null);
     setDialog(mode);
+  }
+
+  function saveConfig(nextConfig: OpenSandboxConfig) {
+    localStorage.setItem(configStorageKey, JSON.stringify(nextConfig));
+    setConfig(nextConfig);
+    setConfigOpen(false);
+    setToast("配置已保存");
+    setPage(1);
   }
 
   async function mutate(action: () => Promise<string>) {
@@ -136,6 +179,10 @@ export function Dashboard() {
             Open<span>Sandbox</span>
           </span>
           <div className="topnav-actions">
+            <button className="btn-sm" onClick={() => setConfigOpen(true)} title="连接配置">
+              <Settings size={15} />
+              连接配置
+            </button>
             <button className="btn-sm" onClick={() => void loadSandboxes()} disabled={isPending} title="刷新">
               <RefreshCw size={15} />
               刷新
@@ -151,7 +198,7 @@ export function Dashboard() {
       <main className="container">
         <section className="page-header">
           <h1>沙箱管理</h1>
-          <p className="lead">管理 OpenSandbox 实例的生命周期、命令执行、文件、端点、指标和网络策略。</p>
+          <p className="lead">{isConfigComplete(config) ? `连接到 ${config.protocol}://${config.domain}` : "填写 OpenSandbox 连接配置后开始管理沙箱。"}</p>
         </section>
 
         {error ? <div className="alert">{error}</div> : null}
@@ -217,9 +264,9 @@ export function Dashboard() {
                       <IconAction title="端点" onClick={() => openDialog("endpoint", sandbox)} icon={<Activity size={14} />} />
                       <IconAction title="指标" onClick={() => openDialog("metrics", sandbox)} icon={<Gauge size={14} />} />
                       {sandbox.status.state === "Paused" ? (
-                        <IconAction title="恢复" onClick={() => void mutate(() => postAction(`/api/sandboxes/${sandbox.id}/resume`, "已恢复"))} icon={<Play size={14} />} />
+                        <IconAction title="恢复" onClick={() => void mutate(() => postAction(config, `/api/sandboxes/${sandbox.id}/resume`, "已恢复"))} icon={<Play size={14} />} />
                       ) : (
-                        <IconAction title="暂停" onClick={() => void mutate(() => postAction(`/api/sandboxes/${sandbox.id}/pause`, "已暂停"))} icon={<Pause size={14} />} />
+                        <IconAction title="暂停" onClick={() => void mutate(() => postAction(config, `/api/sandboxes/${sandbox.id}/pause`, "已暂停"))} icon={<Pause size={14} />} />
                       )}
                       <IconAction danger title="删除" onClick={() => openDialog("delete", sandbox)} icon={<Trash2 size={14} />} />
                     </div>
@@ -268,13 +315,14 @@ export function Dashboard() {
         </div>
       </footer>
 
-      {dialog === "create" ? <CreateDialog onClose={() => setDialog(null)} onSubmit={mutate} pending={isPending} /> : null}
-      {dialog === "command" && activeSandbox ? <CommandDialog sandbox={activeSandbox} onClose={() => setDialog(null)} /> : null}
-      {dialog === "renew" && activeSandbox ? <RenewDialog sandbox={activeSandbox} onClose={() => setDialog(null)} onSubmit={mutate} pending={isPending} /> : null}
-      {dialog === "delete" && activeSandbox ? <DeleteDialog sandbox={activeSandbox} onClose={() => setDialog(null)} onSubmit={mutate} pending={isPending} /> : null}
-      {dialog === "endpoint" && activeSandbox ? <EndpointDialog sandbox={activeSandbox} onClose={() => setDialog(null)} /> : null}
-      {dialog === "files" && activeSandbox ? <FilesDialog sandbox={activeSandbox} onClose={() => setDialog(null)} /> : null}
-      {dialog === "metrics" && activeSandbox ? <MetricsDialog sandbox={activeSandbox} onClose={() => setDialog(null)} /> : null}
+      {configOpen ? <ConfigDialog config={config} onClose={() => isConfigComplete(config) && setConfigOpen(false)} onSave={saveConfig} /> : null}
+      {dialog === "create" ? <CreateDialog config={config} onClose={() => setDialog(null)} onSubmit={mutate} pending={isPending} /> : null}
+      {dialog === "command" && activeSandbox ? <CommandDialog config={config} sandbox={activeSandbox} onClose={() => setDialog(null)} /> : null}
+      {dialog === "renew" && activeSandbox ? <RenewDialog config={config} sandbox={activeSandbox} onClose={() => setDialog(null)} onSubmit={mutate} pending={isPending} /> : null}
+      {dialog === "delete" && activeSandbox ? <DeleteDialog config={config} sandbox={activeSandbox} onClose={() => setDialog(null)} onSubmit={mutate} pending={isPending} /> : null}
+      {dialog === "endpoint" && activeSandbox ? <EndpointDialog config={config} sandbox={activeSandbox} onClose={() => setDialog(null)} /> : null}
+      {dialog === "files" && activeSandbox ? <FilesDialog config={config} sandbox={activeSandbox} onClose={() => setDialog(null)} /> : null}
+      {dialog === "metrics" && activeSandbox ? <MetricsDialog config={config} sandbox={activeSandbox} onClose={() => setDialog(null)} /> : null}
 
       {toast ? <div className="toast">{toast}</div> : null}
     </>
@@ -299,7 +347,53 @@ function IconAction({ title, icon, onClick, danger }: { title: string; icon: Rea
   );
 }
 
-function CreateDialog({ onClose, onSubmit, pending }: { onClose: () => void; onSubmit: (action: () => Promise<string>) => Promise<void>; pending: boolean }) {
+function ConfigDialog({ config, onClose, onSave }: { config: OpenSandboxConfig; onClose: () => void; onSave: (config: OpenSandboxConfig) => void }) {
+  const [domain, setDomain] = useState(config.domain);
+  const [apiKey, setApiKey] = useState(config.apiKey);
+  const [protocol, setProtocol] = useState<"http" | "https">(config.protocol);
+  const [requestTimeoutSeconds, setRequestTimeoutSeconds] = useState(config.requestTimeoutSeconds);
+  const [useServerProxy, setUseServerProxy] = useState(config.useServerProxy);
+
+  const nextConfig: OpenSandboxConfig = {
+    domain: domain.trim(),
+    apiKey: apiKey.trim(),
+    protocol,
+    requestTimeoutSeconds,
+    useServerProxy,
+  };
+
+  return (
+    <Modal title="连接配置" subtitle="配置会保存在当前浏览器" onClose={onClose}>
+      <Field label="OpenSandbox Domain">
+        <input value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="opensandbox-api-kn.sk8s.cn" />
+      </Field>
+      <Field label="API Key">
+        <input value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="输入你的 OpenSandbox API Key" />
+      </Field>
+      <Field label="协议">
+        <select value={protocol} onChange={(event) => setProtocol(event.target.value as "http" | "https")}>
+          <option value="https">https</option>
+          <option value="http">http</option>
+        </select>
+      </Field>
+      <Field label="请求超时秒数">
+        <input type="number" min={30} value={requestTimeoutSeconds} onChange={(event) => setRequestTimeoutSeconds(Number(event.target.value))} />
+      </Field>
+      <label className="check-field">
+        <input type="checkbox" checked={useServerProxy} onChange={(event) => setUseServerProxy(event.target.checked)} />
+        使用服务端代理访问沙箱端点
+      </label>
+      <div className="modal-actions">
+        {isConfigComplete(config) ? <button className="btn-cancel" onClick={onClose}>取消</button> : null}
+        <button className="btn-confirm" disabled={!isConfigComplete(nextConfig)} onClick={() => onSave(nextConfig)}>
+          保存配置
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function CreateDialog({ config, onClose, onSubmit, pending }: { config: OpenSandboxConfig; onClose: () => void; onSubmit: (action: () => Promise<string>) => Promise<void>; pending: boolean }) {
   const [image, setImage] = useState("alpine:3.20");
   const [name, setName] = useState("dashboard-sandbox");
   const [timeoutSeconds, setTimeoutSeconds] = useState(600);
@@ -322,9 +416,8 @@ function CreateDialog({ onClose, onSubmit, pending }: { onClose: () => void; onS
           disabled={pending}
           onClick={() =>
             void onSubmit(async () => {
-              const response = await fetch("/api/sandboxes", {
+              const response = await apiFetch(config, "/api/sandboxes", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   image,
                   timeoutSeconds,
@@ -344,7 +437,7 @@ function CreateDialog({ onClose, onSubmit, pending }: { onClose: () => void; onS
   );
 }
 
-function CommandDialog({ sandbox, onClose }: { sandbox: SandboxInfo; onClose: () => void }) {
+function CommandDialog({ config, sandbox, onClose }: { config: OpenSandboxConfig; sandbox: SandboxInfo; onClose: () => void }) {
   const [command, setCommand] = useState("echo hello from opensandbox");
   const [output, setOutput] = useState("");
   const [pending, setPending] = useState(false);
@@ -353,9 +446,8 @@ function CommandDialog({ sandbox, onClose }: { sandbox: SandboxInfo; onClose: ()
     setPending(true);
     setOutput("");
     try {
-      const response = await fetch(`/api/sandboxes/${sandbox.id}/command`, {
+      const response = await apiFetch(config, `/api/sandboxes/${sandbox.id}/command`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command, timeoutSeconds: 30 }),
       });
       const data = await readJson<{ logs?: { stdout?: { text: string }[]; stderr?: { text: string }[] } }>(response);
@@ -381,7 +473,7 @@ function CommandDialog({ sandbox, onClose }: { sandbox: SandboxInfo; onClose: ()
   );
 }
 
-function RenewDialog({ sandbox, onClose, onSubmit, pending }: { sandbox: SandboxInfo; onClose: () => void; onSubmit: (action: () => Promise<string>) => Promise<void>; pending: boolean }) {
+function RenewDialog({ config, sandbox, onClose, onSubmit, pending }: { config: OpenSandboxConfig; sandbox: SandboxInfo; onClose: () => void; onSubmit: (action: () => Promise<string>) => Promise<void>; pending: boolean }) {
   const [hours, setHours] = useState(6);
 
   return (
@@ -395,7 +487,7 @@ function RenewDialog({ sandbox, onClose, onSubmit, pending }: { sandbox: Sandbox
       </div>
       <div className="modal-actions">
         <button className="btn-cancel" onClick={onClose}>取消</button>
-        <button className="btn-confirm" disabled={pending} onClick={() => void onSubmit(() => postAction(`/api/sandboxes/${sandbox.id}/renew`, `已续期 ${hours} 小时`, { timeoutSeconds: hours * 3600 }))}>
+        <button className="btn-confirm" disabled={pending} onClick={() => void onSubmit(() => postAction(config, `/api/sandboxes/${sandbox.id}/renew`, `已续期 ${hours} 小时`, { timeoutSeconds: hours * 3600 }))}>
           确认续期
         </button>
       </div>
@@ -403,7 +495,7 @@ function RenewDialog({ sandbox, onClose, onSubmit, pending }: { sandbox: Sandbox
   );
 }
 
-function DeleteDialog({ sandbox, onClose, onSubmit, pending }: { sandbox: SandboxInfo; onClose: () => void; onSubmit: (action: () => Promise<string>) => Promise<void>; pending: boolean }) {
+function DeleteDialog({ config, sandbox, onClose, onSubmit, pending }: { config: OpenSandboxConfig; sandbox: SandboxInfo; onClose: () => void; onSubmit: (action: () => Promise<string>) => Promise<void>; pending: boolean }) {
   const [confirm, setConfirm] = useState("");
   const name = getSandboxName(sandbox);
 
@@ -414,7 +506,7 @@ function DeleteDialog({ sandbox, onClose, onSubmit, pending }: { sandbox: Sandbo
       </Field>
       <div className="modal-actions">
         <button className="btn-cancel" onClick={onClose}>取消</button>
-        <button className="btn-danger-solid" disabled={pending || confirm !== name} onClick={() => void onSubmit(() => deleteAction(`/api/sandboxes/${sandbox.id}`, "沙箱已删除"))}>
+        <button className="btn-danger-solid" disabled={pending || confirm !== name} onClick={() => void onSubmit(() => deleteAction(config, `/api/sandboxes/${sandbox.id}`, "沙箱已删除"))}>
           删除
         </button>
       </div>
@@ -422,13 +514,13 @@ function DeleteDialog({ sandbox, onClose, onSubmit, pending }: { sandbox: Sandbo
   );
 }
 
-function EndpointDialog({ sandbox, onClose }: { sandbox: SandboxInfo; onClose: () => void }) {
+function EndpointDialog({ config, sandbox, onClose }: { config: OpenSandboxConfig; sandbox: SandboxInfo; onClose: () => void }) {
   const [port, setPort] = useState(44772);
   const [result, setResult] = useState("");
 
   async function loadEndpoint() {
     try {
-      const response = await fetch(`/api/sandboxes/${sandbox.id}/endpoint?port=${port}`);
+      const response = await apiFetch(config, `/api/sandboxes/${sandbox.id}/endpoint?port=${port}`);
       const data = await readJson<{ endpoint: { endpoint: string }; url: string }>(response);
       setResult(`${data.endpoint.endpoint}\n${data.url}`);
     } catch (err) {
@@ -450,14 +542,14 @@ function EndpointDialog({ sandbox, onClose }: { sandbox: SandboxInfo; onClose: (
   );
 }
 
-function FilesDialog({ sandbox, onClose }: { sandbox: SandboxInfo; onClose: () => void }) {
+function FilesDialog({ config, sandbox, onClose }: { config: OpenSandboxConfig; sandbox: SandboxInfo; onClose: () => void }) {
   const [path, setPath] = useState("/tmp/opensandbox-dashboard.txt");
   const [content, setContent] = useState("hello\n");
   const [result, setResult] = useState("");
 
   async function readFile() {
     try {
-      const response = await fetch(`/api/sandboxes/${sandbox.id}/files?path=${encodeURIComponent(path)}`);
+      const response = await apiFetch(config, `/api/sandboxes/${sandbox.id}/files?path=${encodeURIComponent(path)}`);
       const data = await readJson<{ content: string }>(response);
       setResult(data.content);
     } catch (err) {
@@ -467,9 +559,8 @@ function FilesDialog({ sandbox, onClose }: { sandbox: SandboxInfo; onClose: () =
 
   async function writeFile() {
     try {
-      const response = await fetch(`/api/sandboxes/${sandbox.id}/files`, {
+      const response = await apiFetch(config, `/api/sandboxes/${sandbox.id}/files`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path, data: content }),
       });
       await readJson(response);
@@ -497,13 +588,13 @@ function FilesDialog({ sandbox, onClose }: { sandbox: SandboxInfo; onClose: () =
   );
 }
 
-function MetricsDialog({ sandbox, onClose }: { sandbox: SandboxInfo; onClose: () => void }) {
+function MetricsDialog({ config, sandbox, onClose }: { config: OpenSandboxConfig; sandbox: SandboxInfo; onClose: () => void }) {
   const [result, setResult] = useState("");
 
   useEffect(() => {
     async function loadMetrics() {
       try {
-        const response = await fetch(`/api/sandboxes/${sandbox.id}/metrics`);
+        const response = await apiFetch(config, `/api/sandboxes/${sandbox.id}/metrics`);
         const data = await readJson(response);
         setResult(JSON.stringify(data, null, 2));
       } catch (err) {
@@ -512,7 +603,7 @@ function MetricsDialog({ sandbox, onClose }: { sandbox: SandboxInfo; onClose: ()
     }
 
     void loadMetrics();
-  }, [sandbox.id]);
+  }, [config, sandbox.id]);
 
   return (
     <Modal title="资源指标" subtitle={getSandboxName(sandbox)} onClose={onClose}>
@@ -545,20 +636,34 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-async function postAction(url: string, message: string, body?: unknown) {
-  const response = await fetch(url, {
+async function postAction(config: OpenSandboxConfig, url: string, message: string, body?: unknown) {
+  const response = await apiFetch(config, url, {
     method: "POST",
-    headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
   await readJson(response);
   return message;
 }
 
-async function deleteAction(url: string, message: string) {
-  const response = await fetch(url, { method: "DELETE" });
+async function deleteAction(config: OpenSandboxConfig, url: string, message: string) {
+  const response = await apiFetch(config, url, { method: "DELETE" });
   await readJson(response);
   return message;
+}
+
+function apiFetch(config: OpenSandboxConfig, input: RequestInfo | URL, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("Content-Type", "application/json");
+  headers.set("x-opensandbox-domain", config.domain);
+  headers.set("x-opensandbox-api-key", config.apiKey);
+  headers.set("x-opensandbox-protocol", config.protocol);
+  headers.set("x-opensandbox-request-timeout-seconds", String(config.requestTimeoutSeconds));
+  headers.set("x-opensandbox-use-server-proxy", String(config.useServerProxy));
+
+  return fetch(input, {
+    ...init,
+    headers,
+  });
 }
 
 async function readJson<T = unknown>(response: Response): Promise<T> {
@@ -569,6 +674,25 @@ async function readJson<T = unknown>(response: Response): Promise<T> {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "请求失败";
+}
+
+function readStoredConfig() {
+  try {
+    const raw = localStorage.getItem(configStorageKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<OpenSandboxConfig>;
+    const config = {
+      ...defaultConfig,
+      ...parsed,
+    };
+    return isConfigComplete(config) ? config : null;
+  } catch {
+    return null;
+  }
+}
+
+function isConfigComplete(config: OpenSandboxConfig) {
+  return Boolean(config.domain.trim() && config.apiKey.trim() && config.requestTimeoutSeconds > 0);
 }
 
 function getSandboxName(sandbox: SandboxInfo) {

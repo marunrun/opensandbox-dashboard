@@ -14,7 +14,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { sandboxId } = await params;
     const body = commandSchema.parse(await request.json());
-    const execution = await withSandbox(sandboxId, (sandbox) =>
+    const execution = await withSandbox(request, sandboxId, (sandbox) =>
       sandbox.commands.run(body.command, {
         workingDirectory: body.workingDirectory,
         timeoutSeconds: body.timeoutSeconds,

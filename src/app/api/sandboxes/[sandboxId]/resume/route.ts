@@ -8,10 +8,10 @@ type Params = {
   params: Promise<{ sandboxId: string }>;
 };
 
-export async function POST(_request: NextRequest, { params }: Params) {
+export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { sandboxId } = await params;
-    await withManager((manager) => manager.resumeSandbox(sandboxId));
+    await withManager(request, (manager) => manager.resumeSandbox(sandboxId));
     return NextResponse.json({ ok: true });
   } catch (error) {
     return toErrorResponse(error);

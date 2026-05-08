@@ -350,6 +350,7 @@
 }
 
 .field input,
+.field select,
 .field textarea {
   width: 100%;
   padding: 10px 12px;
@@ -363,6 +364,20 @@
   min-height: 108px;
   resize: vertical;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.check-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg);
+  margin-top: 4px;
+}
+
+.check-field input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
 }
 
 .modal-actions {

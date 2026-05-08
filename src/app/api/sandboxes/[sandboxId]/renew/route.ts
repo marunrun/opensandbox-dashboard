@@ -13,7 +13,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { sandboxId } = await params;
     const body = renewSandboxSchema.parse(await request.json());
-    await withManager((manager) => manager.renewSandbox(sandboxId, body.timeoutSeconds));
+    await withManager(request, (manager) => manager.renewSandbox(sandboxId, body.timeoutSeconds));
     return NextResponse.json({ ok: true });
   } catch (error) {
     return toErrorResponse(error);
